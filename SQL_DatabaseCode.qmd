@@ -1,0 +1,349 @@
+---
+title: "SQL_DatabaseCode"
+format: html
+---
+
+```{r}
+library(data.table)
+library(dplyr)
+```
+
+### for gene_info table
+```{r}
+analysis_data <- read.csv("./clean_stage2.csv", header = TRUE, sep = ",")
+analysis_data
+```
+
+#### subsetting gene_accession_id, gene_symbol based on the database schema 
+```{r}
+gene_info <- analysis_data[, c("gene_accession_id", "gene_symbol")]
+gene_info
+```
+
+#### ensuring no leading/trailing spaces exist and that all observations are distinct 
+```{r}
+gene_info$gene_accession_id <- toupper(gene_info$gene_accession_id)
+gene_info$gene_accession_id <- trimws(gene_info$gene_accession_id)
+gene_info$gene_symbol <- trimws(gene_info$gene_symbol)
+
+gene_info <- distinct(gene_info)
+```
+
+#### adding primary key gene_id 
+```{r}
+gene_info$gene_id <- 1:nrow(gene_info) 
+```
+
+#### reordering the columns to match the database schema 
+```{r}
+gene_info <- gene_info[, c("gene_id", "gene_accession_id", "gene_symbol")]
+gene_info
+```
+
+#### saving the dataframe to a csv file 
+```{r}
+fwrite(gene_info, "./SQLdb_Tables_CSVs_Normalized/gene_info_sql.csv")
+```
+
+
+### for mouse_info table
+```{r}
+mouse_info <- analysis_data[, c("mouse_strain", "mouse_life_stage")] # selecting columns needed for the mouse_info table in db
+mouse_info
+```
+
+#### ensuring all observations are distinct
+```{r}
+mouse_info <- distinct(mouse_info)
+```
+
+#### adding primary key mouse_id 
+```{r}
+mouse_info$mouse_id <- 1:nrow(mouse_info) 
+```
+
+#### reordering columns to match database schema 
+```{r}
+mouse_info <- mouse_info[, c("mouse_id", "mouse_strain", "mouse_life_stage")]
+```
+
+#### saving dataframe as a csv file 
+```{r}
+fwrite(mouse_info, "./SQLdb_Tables_CSVs_Normalized/mouse_info_sql.csv")
+```
+
+
+### for procedure_info table
+```{r}
+procedure_info <- read.csv("../IMPC_procedure.txt", header = TRUE, sep = ",")
+procedure_info
+```
+
+#### ensuring no leading/trailing spaces exist and that all observations are distinct 
+```{r}
+procedure_info$impcParameterOrigId = trimws(procedure_info$impcParameterOrigId)
+procedure_info$name = trimws(procedure_info$name)
+procedure_info$description = trimws(procedure_info$description)
+procedure_info$isMandatory = trimws(procedure_info$isMandatory)
+
+
+procedure_info <- distinct(procedure_info)
+```
+
+#### adding primary_key procedure_id 
+```{r}
+procedure_info$procedure_id <- 1:nrow(procedure_info) 
+```
+
+#### reordering the columns to match database schema
+```{r}
+procedure_info <- procedure_info[, c("procedure_id", "impcParameterOrigId", "name", "description", "isMandatory")]
+```
+
+#### saving dataframe to a csv file 
+```{r}
+fwrite(procedure_info, "./SQLdb_Tables_CSVs_Normalized/procedure_info_sql.csv")
+```
+
+
+### for parameter_desc table
+```{r}
+param_desc <- read.csv("../unique_cleaned_param_desc.csv", header = TRUE, sep = ",")
+param_desc
+```
+
+#### selecting columns needed for parameter_desc table in the database
+```{r}
+param_desc <- param_desc[, c("parameterId", "impcParameterOrigId", "name", "description")]
+```
+
+#### ensuring no leading/trailing white spaces exist and that all observations are unique 
+```{r}
+param_desc$parameterId <- trimws(param_desc$parameterId)
+param_desc$impcParameterOrigId <- trimws(param_desc$impcParameterOrigId)
+param_desc$name <- trimws(param_desc$name)
+param_desc$description <- trimws(param_desc$description)
+
+param_desc <- distinct(param_desc)
+```
+
+#### adding primary key param_desc_id 
+```{r}
+param_desc$param_desc_id <- 1:nrow(param_desc) 
+```
+
+#### reordering columns to match the database schema
+```{r}
+param_desc <- param_desc[, c("param_desc_id", "parameterId", "impcParameterOrigId", "name", "description")]
+```
+
+#### joining param_desc with procedure_info to find the corresponding procedure_id for a parameter 
+```{r}
+param_desc_joined <- param_desc %>%
+  left_join(procedure_info %>% select(impcParameterOrigId, procedure_id),
+            by = "impcParameterOrigId")
+param_desc_joined
+```
+
+#### saving dataframe to a csv file 
+```{r}
+fwrite(param_desc_joined, "./SQLdb_Tables_CSVs_Normalized/param_desc_sql.csv")
+```
+
+
+### for disease_ontology_info table
+```{r}
+disease_onto <- read.csv("../Disease_information.txt", header = TRUE, sep = "\t")
+disease_onto
+```
+
+#### ensuring no leading/trailing white spaces exist and that all observations are unique 
+```{r}
+disease_onto$DO.Disease.ID <- trimws(disease_onto$DO.Disease.ID)
+disease_onto$DO.Disease.Name <- trimws(disease_onto$DO.Disease.Name)
+disease_onto$OMIM.IDs <- trimws(disease_onto$OMIM.IDs)
+disease_onto$Mouse.MGI.ID <- trimws(disease_onto$Mouse.MGI.ID)
+
+disease_onto <- distinct(disease_onto)
+```
+
+#### adding primary key disease_id 
+```{r}
+disease_onto$disease_id <- 1:nrow(disease_onto)
+```
+
+#### renaming cols (Mouse MGI ID to gene_accession_id) in disease onto and ensuring the gene_accession_id is in uppercase 
+```{r}
+colnames(disease_onto) <- c("DO.Disease.ID", "DO.Disease.Name", "OMIM.IDs", "gene_accession_id" ,"disease_id")
+disease_onto$gene_accession_id <- toupper(disease_onto$gene_accession_id)
+```
+
+#### reordering the columns to match the database schema
+```{r}
+disease_onto <- disease_onto[, c("disease_id", "DO.Disease.ID", "DO.Disease.Name", "OMIM.IDs", "gene_accession_id")]
+```
+
+#### saving dataframe to csv file 
+```{r}
+fwrite(disease_onto, "./SQLdb_Tables_CSVs_Normalized/disease_onto_info_sql.csv")
+```
+
+
+### for parameter_groupings table
+```{r}
+param_group <- read.csv("./parametergroupings_working.csv", header = TRUE, sep = ",")
+param_group
+```
+
+#### selecting columns defined in the database schema and ensuring no leading/trailing white spaces exist and that all observations are unique 
+```{r}
+param_group <- param_group[, c("parameter_id", "analysis_id", "grouping")]
+
+param_group$parameter_id <- trimws(param_group$parameter_id)
+param_group$analysis_id <- trimws(param_group$analysis_id)
+param_group$grouping <- trimws(param_group$grouping)
+
+param_group <- distinct(param_group)
+```
+
+#### adding primary key param_group_id
+```{r}
+param_group$param_group_id <- 1:nrow(param_group)
+```
+
+#### reordering and renaming columns (parameter_id to parameterId) 
+```{r}
+param_group <- param_group[, c("param_group_id", "parameter_id", "analysis_id", "grouping")]
+colnames(param_group) <- c("param_group_id", "parameterId", "analysis_id", "grouping")
+```
+
+#### saving dataframe as a csv file 
+```{r}
+fwrite(param_group, "./SQLdb_Tables_CSVs_Normalized/param_group_sql.csv")
+```
+
+
+### for analysis_data table
+```{r}
+analysis_data <- read.csv("./clean_stage2.csv", header = TRUE, sep = ",")
+analysis_data
+```
+
+#### ensuring no leading/trailing white spaces exist and that all observations are unique 
+```{r}
+analysis_data$gene_accession_id <- toupper(analysis_data$gene_accession_id)
+analysis_data$gene_accession_id <- trimws(analysis_data$gene_accession_id)
+analysis_data$gene_symbol <- trimws(analysis_data$gene_symbol)
+analysis_data$mouse_strain <- trimws(analysis_data$mouse_strain)
+analysis_data$mouse_life_stage <- trimws(analysis_data$mouse_life_stage)
+analysis_data$parameter_id <- trimws(analysis_data$parameter_id)
+analysis_data$parameter_name <- trimws(analysis_data$parameter_name)
+analysis_data$analysis_id <- trimws(analysis_data$analysis_id)
+analysis_data$pvalue <- trimws(analysis_data$pvalue)
+
+analysis_data <- distinct(analysis_data)
+```
+
+#### selecting columns defined in the database schema
+```{r}
+analysis_data <- analysis_data[, c("gene_accession_id", "parameter_id", "analysis_id", "mouse_strain", "pvalue")]
+```
+
+#### adding primary key data_analysis_id 
+```{r}
+analysis_data$data_analysis_id <- 1:nrow(analysis_data)
+```
+
+#### reordering and renaming columns (parameter_id to parameterId) before matching gene_id/mouse_id/param_desc_id
+```{r}
+analysis_data <- analysis_data[, c("data_analysis_id", "gene_accession_id", "mouse_strain", "parameter_id", "analysis_id", "pvalue")]
+colnames(analysis_data) <- c("data_analysis_id", "gene_accession_id", "mouse_strain", "parameterId", "analysis_id", "pvalue")
+```
+
+#### creating columns gene_id/mouse_id/param_desc_id and matching the values to their respective tables -> to connect the tables in the database
+```{r}
+analysis_data$gene_id <- gene_info$gene_id[match(analysis_data$gene_accession_id, gene_info$gene_accession_id)]
+analysis_data$mouse_id <- mouse_info$mouse_id[match(analysis_data$mouse_strain, mouse_info$mouse_strain)]
+analysis_data$param_desc_id <- param_desc$param_desc_id[match(analysis_data$parameterId, param_desc$parameterId)]
+```
+
+#### selecting columns defined in the database schema 
+```{r}
+analysis_data <- analysis_data %>%
+  select(data_analysis_id, analysis_id, gene_id, mouse_id, param_desc_id, pvalue)
+```
+
+#### saving dataframe to a csv file 
+```{r}
+fwrite(analysis_data, "./SQLdb_Tables_CSVs_Normalized/analysis_data_sql.csv")
+```
+
+
+### writing/creating the insert statements for database
+```{r}
+create_sql_insert_file <- function(csv_path, table_name, output_sql) {
+  
+  df <- read.csv(csv_path, stringsAsFactors = FALSE)
+  
+  # identify character columns
+  char_cols <- sapply(df, is.character)
+  
+  # escape SQL characters and wrap in quotes
+  escape_sql <- function(x) {
+    x <- gsub("'", "''", x)        # escape single quotes
+    paste0("'", x, "'")            # wrap in SQL single quotes
+  }
+  
+  df[char_cols] <- lapply(df[char_cols], escape_sql) 
+  
+  df[is.na(df)] <- "NULL" # replace NAs with NULL -> for SQL 
+  
+  # creating the statements: insert into _table_ values() ;
+  insert_lines <- apply(df, 1, function(row) {
+    values <- paste(row, collapse = ", ")
+    paste0("INSERT INTO ", table_name, " VALUES (", values, ");")
+    #paste0("VALUES (", values, ");")
+  })
+  
+  # write lines pastes the insert statements stored in insert_lines into .sql file type  
+  writeLines(insert_lines, output_sql)
+  
+  
+  paste("SQL file created:", output_sql)
+}
+```
+
+#### creating insert statements for gene_info table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/gene_info_sql.csv", table_name = "gene_info (gene_id, gene_accession_id, gene_symbol)", output_sql = "./SQLdb_Tables_CSVs_Normalized/gene_info_inserts_statements.sql")
+```
+
+#### creating insert statements for mouse_info table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/mouse_info_sql.csv", table_name = "mouse_info (mouse_id, mouse_strain, mouse_life_stage)", output_sql = "./SQLdb_Tables_CSVs_Normalized/mouse_info_inserts_statements.sql")
+```
+
+#### creating insert statements for procedure_info table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/procedure_info_sql.csv", table_name = "procedure_info (procedure_id, param_orig_id, procedure_name, procedure_desc, mandatory)", output_sql = "./SQLdb_Tables_CSVs_Normalized/procedure_info_inserts_statements.sql")
+```
+
+#### creating insert statements for parameter_desc table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/param_desc_sql.csv", table_name = "parameter_desc (param_desc_id, param_id, param_orig_id, param_name, param_desc, procedure_id)", output_sql = "./SQLdb_Tables_CSVs_Normalized/parameter_desc_inserts_statements.sql")
+```
+
+#### creating insert statements for disease_ontology_info table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/disease_onto_info_sql.csv", table_name = "disease_ontology_info (disease_id, disease_onto_id, disease_name, omim_id, gene_accession_id)", output_sql = "./SQLdb_Tables_CSVs_Normalized/disease_ontology_info_inserts_statements.sql")
+```
+
+#### creating insert statements for parameter_groupings table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/param_group_sql.csv", table_name = "parameter_groupings (param_group_id, param_id, analysis_id, param_grouping)", output_sql = "./SQLdb_Tables_CSVs_Normalized/parameter_groupings_inserts_statements.sql")
+```
+
+#### creating insert statements for analysis_data table
+```{r}
+create_sql_insert_file("./SQLdb_Tables_CSVs_Normalized/analysis_data_sql.csv", table_name = "analysis_data (data_analysis_id, analysis_id, gene_id, mouse_id, param_desc_id, pvalue_sig)", output_sql = "./SQLdb_Tables_CSVs_Normalized/analysis_data_inserts_statements.sql")
+```

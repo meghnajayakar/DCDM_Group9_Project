@@ -1,0 +1,381 @@
+---
+title: "DataCleaning_ParameterGroupingCode"
+format: html
+---
+### merging files on the HPC  
+```{r}
+data_files_names_path <- "./datafileNames.txt"
+
+data_names <- read.csv(data_files_names_path, header = FALSE) 
+
+#datafiles_path <- "\\Projects_Trial\\data" # tested the function on a few data files on local machine before running it for all data files on the HPC
+
+datafiles_path <- "./data" 
+
+# specifying column order for the merged dataframe
+col_order <- as.list(c( 
+  "gene_accession_id", "gene_symbol", "mouse_strain",
+  "mouse_life_stage", "parameter_id", "pvalue",
+  "parameter_name", "analysis_id"
+))
+
+read_transpose_merge <- function(file_path) {
+  df <- read.csv(file_path, header = FALSE, sep = ",") # read csv without headers
+  
+  df <- t(df) # transpose df 
+  df <- data.frame(df) # convert to df 
+  
+  header <- as.character(unlist(df[1, ])) # takes the first row of the transposed df and unlists it, converts it to a character variable and stores it in header
+  df <- df[-1, , drop = FALSE] # removes the first row of column headers from the df and preserves the df format (drop = FALSE)
+  colnames(df) <- header # makes header the colnames of the df 
+  
+  # converting colnames to lowercase -> normalizing the data to ensure the merging process is easier 
+  colnames(df) <- tolower(colnames(df))
+  col_order_chr <- tolower(as.character(unlist(col_order)))
+  
+  # reorder columns so its the same to match the col_order list and preserves the df format instead of making it a vector (drop = FALSE)
+  df <- df[, col_order_chr, drop = FALSE]
+  
+  return(df)
+}
+
+files <- list.files(datafiles_path, pattern = "*.csv", full.names = TRUE) # list of all the files inside /data, keeps all the csv files with their full names to make it a full path so its datafiles_path/csv_file.csv 
+dfs <- lapply(files, read_transpose_merge) # apply the function read_transpose_merge to all the csv files in the list "files"
+
+#valid_indices <- !sapply(dfs, is.null)  # identify any NULL results in case function read_transpose_merge fails 
+#valid_files <- files[valid_indices] # store all the valid indices where read_transpose_merge worked
+#invalid_files <- files[!valid_indices] # store all the invalid indices where the function didn't work 
+
+merged <- do.call(rbind, dfs) # all indices were valid, did not need to use dfs[valid_files] 
+```
+
+### packages
+```{r}
+library(dplyr)
+library(data.table)
+library(stringi)
+```
+
+
+### cleaning merged data
+```{r}
+merged_data_path <- "./merged.csv"
+merged_data <- read.csv(merged_data_path, header = TRUE, sep = ",")
+merged_data
+```
+
+#### converting parameter_id to uppercase
+```{r}
+merged_data$parameter_id <- toupper(merged_data$parameter_id)
+```
+
+#### converting and replacing encoding error in parameter_name 
+```{r}
+fix_encoding <- function(x) {
+  iconv(x, "UTF-8", "ASCII", sub = "") # converts x from UTF-8 encoding to ASCII encoding, substitutes unknown character with an empty string "" 
+}
+
+merged_data$parameter_name <- fix_encoding(merged_data$parameter_name)
+merged_data$parameter_name[merged_data$parameter_name == "Nave CD8+ T cells - % of live leukocytes (Panel A)"] = "Naive CD8+ T cells - % of live leukocytes (Panel A)"
+```
+
+#### converting mouse_life_stage to proper case
+```{r}
+proper <- function(x)
+  paste0(toupper(substr(x, 1, 1)), tolower(substring(x, 2)))
+
+
+merged_data$mouse_life_stage <- proper(merged_data$mouse_life_stage)
+```
+
+#### converting gene_accession_id to uppercase
+```{r}
+merged_data$gene_accession_id <- toupper(merged_data$gene_accession_id)
+```
+
+#### converting and replacing typos in mouse_strain with the strains mentioned in the SOP - 
+```{r}
+merged_data$mouse_strain <- trimws(merged_data$mouse_strain) # trimming white spaces if they exist in the values
+
+merged_data <- merged_data %>% mutate(mouse_strain = recode(mouse_strain, "C50BL" = "C57BL",
+                                               "C51BL" = "C57BL",
+                                               "C52BL" = "C57BL",
+                                               "C53BL" = "C57BL",
+                                               "C54BL" = "C57BL",
+                                               "C55BL" = "C57BL",
+                                               "C56BL" = "C57BL",
+                                               "C58BL" = "C57BL",
+                                               "C59BL" = "C57BL",
+                                               "120SV" = "129SV",
+                                               "123SV" = "129SV",
+                                               "126SV" = "129SV",
+                                               "127SV" = "129SV"
+                                        ))
+
+```
+
+#### remvoing leading/trailing white spaces in all columns
+```{r}
+merged_data$gene_accession_id <- trimws(merged_data$gene_accession_id)
+merged_data$gene_symbol <- trimws(merged_data$gene_symbol)
+merged_data$mouse_strain <- trimws(merged_data$mouse_strain)
+merged_data$mouse_life_stage <- trimws(merged_data$mouse_life_stage)
+merged_data$parameter_id <- trimws(merged_data$parameter_id)
+merged_data$pvalue <- trimws(merged_data$pvalue)
+merged_data$parameter_name <- trimws(merged_data$parameter_name)
+merged_data$analysis_id <- trimws(merged_data$analysis_id)
+```
+
+```{r}
+merged_data
+```
+
+#### checking if dimensions of unique merged data file is the same as merged data -> no duplicates found 
+```{r}
+dim(merged_data) == dim(distinct(merged_data))
+```
+
+#### saving cleaned & de-duplicated merged dataframe to a csv file 
+```{r}
+fwrite(merged_data, "./clean_stage2.csv")
+```
+
+
+### cleaning IMPC_parameter_description data
+```{r}
+param_desc <- read.csv("./IMPC_parameter_description.txt", header = TRUE, sep = ",")
+```
+
+#### removing the leading/trailing spaces and replacing string "NA" in the description column with an empty string
+```{r}
+param_desc$impcParameterOrigId <- trimws(param_desc$impcParameterOrigId)
+param_desc$name <- trimws(param_desc$name)
+param_desc$description <- trimws(param_desc$description)
+param_desc$parameterId <- trimws(param_desc$parameterId)
+
+param_desc <- param_desc %>% mutate(description = recode(description, "NA" = ""))
+```
+
+#### converting and replacing the encoding error in name
+```{r}
+fix_encoding <- function(x) {
+  iconv(x, "UTF-8", "ASCII", sub = "")
+}
+
+param_desc$name <- fix_encoding(param_desc$name)
+param_desc$name <- gsub("\\bNave\\b", "Naive", param_desc$name)
+```
+
+#### removing duplicates 
+```{r}
+dim(param_desc) == dim(distinct(param_desc)) # dimensions don't match -> duplicates
+param_desc <- distinct(param_desc)
+```
+
+#### checking if any duplicates exist -> no duplicates found 
+```{r}
+dim(param_desc) == dim(distinct(param_desc))
+```
+
+#### loading the clean + unique param_desc dataframe
+```{r}
+param_desc
+```
+
+#### saving cleaned + de-duplicated dataframe as csv file
+```{r}
+fwrite(param_desc, "./unique_cleaned_param_desc.csv")
+```
+
+
+
+### cleaning IMPC procedure data
+```{r}
+impc_procedure <- read.csv("./IMPC_procedure.txt", header = TRUE, sep = ",")
+```
+
+#### removing leading/trailing white spaces 
+```{r}
+impc_procedure$name <- trimws(impc_procedure$name)
+impc_procedure$description <- trimws(impc_procedure$description)
+impc_procedure$isMandatory <- trimws(impc_procedure$isMandatory)
+impc_procedure$impcParameterOrigId <- trimws(impc_procedure$impcParameterOrigId)
+```
+
+#### removing duplicates if they exist
+```{r}
+dim(impc_procedure) == dim(distinct(impc_procedure)) # dimensions match -> no duplicates
+impc_procedure <- distinct(impc_procedure)
+```
+
+#### loading the impc_procedure dataframe 
+```{r}
+impc_procedure
+```
+
+#### saving clean dataframe as a csv file
+```{r}
+fwrite(impc_procedure, "./cleaned_impc_procedure.csv")
+```
+
+
+### parameter grouping methodology 
+```{r}
+clean_data <- read.csv("./clean_stage2.csv", header = TRUE, sep = ",")
+param_desc <- read.csv("./unique_cleaned_param_desc.csv", header = TRUE, sep = ",")
+```
+
+#### joining cleaned analysis data and parameter description on parameter_id
+```{r}
+combined_df <- clean_data %>% left_join(param_desc, by = c("parameter_id" = "parameterId"))
+```
+
+```{r}
+dim(combined_df)
+```
+
+#### joining combined df with impc procedure data on impcParameterOrigId
+```{r}
+# converting impcParameterOrigId in both the combined_df and impc_procedure to integer datatype before joining
+combined_df$impcParameterOrigId <- as.integer(combined_df$impcParameterOrigId)
+impc_procedure$impcParameterOrigId <- as.integer(impc_procedure$impcParameterOrigId)
+
+combined_df <- combined_df %>% left_join(impc_procedure, by = c("impcParameterOrigId" = "impcParameterOrigId"))
+```
+
+#### checking the dimensions of the combined dataframe combined_df
+```{r}
+dim(combined_df)
+```
+
+```{r}
+combined_df
+```
+
+#### renaming columns 
+```{r}
+colnames(combined_df)
+
+colnames(combined_df) <- c("gene_accession_id", "gene_symbol", "mouse_strain", "mouse_life_stage", "parameter_id", 
+                           "pvalue", "parameter_name", "analysis_id", "impcParameterOrigId", "param_desc_name", "param_desc_description", "procedure_name", "procedure_description", "isMandatory")
+```
+
+#### saving the combined_df as a csv file
+```{r}
+library(data.table)
+fwrite(combined_df, "./combined_data_parameters.csv")
+```
+
+#### parameter grouping using only unique entries/observations in combined df 
+```{r}
+df <- read.csv("./combined_data_parameters.csv", header = TRUE, sep = ",")
+df <- distinct(df)
+```
+
+#### defining groups based on parameter_name, procedure_name 
+```{r}
+df_param_grp <- df %>% mutate(grouping = case_when(
+                                   # brain param grouping 
+                                   stri_detect_fixed(parameter_name, "Unexpected behaviors") ~ "Brain",
+                                   stri_detect_fixed(parameter_name, "Tremor") ~ "Brain",
+                                   stri_detect_fixed(parameter_name, "Response amplitude - S") ~ "Brain",
+                                   stri_detect_fixed(parameter_name, "Locomotor activity") ~ "Brain",
+                                   stri_detect_fixed(parameter_name, "Starle response") ~ "Brain",
+                                   stri_detect_fixed(procedure_name, "Auditory Brain Stem Response") ~ "Brain",
+                                   stri_detect_fixed(procedure_name, "Acoustic Startle and Pre-pulse Inhibition (PPI)") ~ "Brain",
+                                   stri_detect_fixed(procedure_name, "Fear Conditioning") ~ "Brain",
+                                   
+                                   # weight param grouping 
+                                   stri_detect_fixed(parameter_name, "Lean Mass") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "Fat Mass") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "Lean/Body Weight") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "BMC/Body weight") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "Fat/Body weight") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "Body Weight") ~ "Weight",
+                                   stri_detect_fixed(parameter_name, "Weight") ~ "Weight",
+                                   
+                                   # images param grouping 
+                                   stri_detect_fixed(procedure_name, "X-ray") ~ "Images",
+                                   stri_detect_fixed(procedure_name, "Body Composition (DEXA lean/fat)") ~ "Images",
+                                   
+                                   # clinical chemistry param grouping 
+                                   stri_detect_fixed(parameter_name, "Chloride") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Potassium") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Glucose") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Albumin") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Thyroxine") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Calcium") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Creatinine") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(parameter_name, "Alkaline phosphatase") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(procedure_name, "Clinical Chemistry") ~ "Clinical Chemistry",
+                                   stri_detect_fixed(procedure_name, "Intraperitoneal glucose tolerance test (IPGTT)") ~ "Clinical Chemistry",
+                                   
+                                   # heart param grouping 
+                                   stri_detect_fixed(parameter_name, "Pericardium Morphology") ~ "Heart",
+                                   stri_detect_fixed(param_desc_name, "Heart weight") ~ "Heart",
+                                   stri_detect_fixed(procedure_name, "Electrocardiogram (ECG)") ~ "Heart",
+                                   
+                                   # eye param grouping 
+                                   stri_detect_fixed(parameter_name, "Vitreous") ~ "Eye",
+                                   stri_detect_fixed(parameter_name, "Corneal mineralization") ~ "Eye",
+                                   stri_detect_fixed(parameter_name, "Retina (combined)") ~ "Eye",
+                                   stri_detect_fixed(parameter_name, "Retinal Blood Vessels") ~ "Eye",
+                                   stri_detect_fixed(parameter_name, "Retinal Blood Vessels Pattern") ~ "Eye",
+                                   stri_detect_fixed(procedure_name, "Eye Morphology") ~ "Eye",
+                                   
+                                   # embryonic development param grouping 
+                                   stri_detect_fixed(parameter_name, "Limb Bud Morphology") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Embryo Size") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Placenta Vasculature") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Pale yolk sac") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Polydactyly") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Cleft palate") ~ "Embryonic Development",
+                                   stri_detect_fixed(parameter_name, "Facial cleft") ~ "Embryonic Development",
+                                   stri_detect_fixed(procedure_name, "Gross Morphology Embryo E9.5") ~ "Embryonic Development",
+                                   stri_detect_fixed(procedure_name, "Gross Morphology Embryo E14.5-E15.5") ~ "Embryonic Development",
+                                   stri_detect_fixed(procedure_name, "Gross Morphology Embryo E18.5") ~ "Embryonic Development",
+                                   stri_detect_fixed(procedure_name, "Gross Morphology Placenta E14.5-E15.5") ~ "Embryonic Development",
+                                   
+                                   # immuno-phenotyping/hematology/grip/open field/ param grouping
+                                   stri_detect_fixed(procedure_name, "Immunophenotyping") ~ "Immunophenotyping",
+                                   stri_detect_fixed(procedure_name, "Hematology") ~ "Hematology",
+                                   stri_detect_fixed(procedure_name, "Grip Strength") ~ "Grip",
+                                   stri_detect_fixed(procedure_name, "Organ Weight") ~ "Organ Weight",
+                                   stri_detect_fixed(procedure_name, "Open Field") ~ "Open Field",
+                                   
+                                   # for non defined groups
+                                   stri_detect_fixed(procedure_name, NA) ~ "Other",
+                                   TRUE ~ "Other"
+                                   
+                                   ))
+```
+
+```{r}
+df_param_grp
+```
+
+#### saving combined parameter grouping df as csv
+```{r}
+fwrite(df_param_grp, "./parametergroupings_working.csv")
+```
+
+
+
+### cleaning disease ontology file
+```{r}
+disease_onto <- read.csv("./Disease_information.txt", header = TRUE, sep = "\t")
+```
+
+#### making sure disease ontology has unique entries
+```{r}
+dim(disease_onto) == dim(distinct(disease_onto))
+disease_onto <- distinct(disease_onto)
+```
+
+```{r}
+fwrite(disease_onto, "./disease_ontology_clean.csv")
+```
+
+
+
+

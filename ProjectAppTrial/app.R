@@ -14,7 +14,7 @@ library(tidyr)
 library(factoextra)
 
 
-clean_data <- read.csv("./clean_stage2.csv")
+clean_data <- read.csv("./clean_stage2.csv", header = TRUE, sep = ",")
 
 # visualization pvalue by Parameter Name for Gene
   # convert all gene_symbols to lower case and ensure distinct gene_symbols are stored 

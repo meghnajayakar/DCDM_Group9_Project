@@ -56,6 +56,9 @@ library(data.table)
 library(stringi)
 ```
 
+```{r}
+fwrite(merged, "./merged.csv") 
+```
 
 ### cleaning merged data
 ```{r}

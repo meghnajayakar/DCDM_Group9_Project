@@ -82,7 +82,7 @@ fwrite(mouse_info, "./SQLdb_Tables_CSVs_Normalized/mouse_info_sql.csv")
 
 ### for procedure_info table
 ```{r}
-procedure_info <- read.csv("../IMPC_procedure.txt", header = TRUE, sep = ",")
+procedure_info <- read.csv("./IMPC_procedure.txt", header = TRUE, sep = ",")
 procedure_info
 ```
 
@@ -115,7 +115,7 @@ fwrite(procedure_info, "./SQLdb_Tables_CSVs_Normalized/procedure_info_sql.csv")
 
 ### for parameter_desc table
 ```{r}
-param_desc <- read.csv("../unique_cleaned_param_desc.csv", header = TRUE, sep = ",")
+param_desc <- read.csv("./IMPC_parameter_description.txt", header = TRUE, sep = ",")
 param_desc
 ```
 
@@ -160,7 +160,7 @@ fwrite(param_desc_joined, "./SQLdb_Tables_CSVs_Normalized/param_desc_sql.csv")
 
 ### for disease_ontology_info table
 ```{r}
-disease_onto <- read.csv("../Disease_information.txt", header = TRUE, sep = "\t")
+disease_onto <- read.csv("./Disease_information.txt", header = TRUE, sep = "\t")
 disease_onto
 ```
 

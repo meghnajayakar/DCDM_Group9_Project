@@ -6,6 +6,13 @@ format: html
 ```{r}
 library(data.table)
 library(dplyr)
+
+dir_path <- "./SQLdb_Tables_CSVs_Normalized/"
+
+# create the directory if it doesn't exist
+if (!dir.exists(dir_path)) {
+  dir.create(dir_path, recursive = TRUE)
+}
 ```
 
 ### for gene_info table

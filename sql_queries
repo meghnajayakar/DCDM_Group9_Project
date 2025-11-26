@@ -1,0 +1,71 @@
+use impc_grp9_db;
+
+-- on the HPC
+-- use database9; 
+
+select distinct gi.gene_symbol,
+ad.analysis_id, 
+ad.pvalue_sig,
+pd.param_name,
+pd.param_desc,
+pi.procedure_name,
+pg.param_grouping
+from analysis_data ad 
+join gene_info gi 
+on ad.gene_id = gi.gene_id
+join parameter_desc pd 
+on ad.param_desc_id = pd.param_desc_id
+left join procedure_info pi 
+on pd.procedure_id = pi.procedure_id
+left join parameter_groupings pg 
+on ad.analysis_id = pg.analysis_id
+where gi.gene_symbol in ('slc25a48', 'ppp2r2a', 'miga1', 'mbtd1');
+
+select distinct gi.gene_symbol,
+ad.analysis_id, 
+ad.pvalue_sig,
+pd.param_name,
+pd.param_desc,
+pi.procedure_name,
+pg.param_grouping
+from analysis_data ad 
+join gene_info gi 
+on ad.gene_id = gi.gene_id
+join parameter_desc pd 
+on ad.param_desc_id = pd.param_desc_id
+left join procedure_info pi 
+on pd.procedure_id = pi.procedure_id
+left join parameter_groupings pg 
+on ad.analysis_id = pg.analysis_id
+where gi.gene_symbol in ('slc25a48', 'ppp2r2a', 'miga1', 'mbtd1')
+and pvalue_sig < 0.05;
+
+select 
+    gi.gene_symbol,
+    doi.disease_onto_id,
+    doi.disease_name,
+    doi.omim_id
+from disease_ontology_info doi
+join gene_info gi
+    on doi.gene_accession_id = gi.gene_accession_id
+where gi.gene_symbol in ('slc25a48', 'ppp2r2a', 'miga1', 'mbtd1');
+
+-- other queries  
+select * from gene_info;
+
+select * from mouse_info;
+
+select * from procedure_info limit 50;
+
+select * from parameter_desc limit 20;
+
+select * from disease_ontology_info limit 20;
+
+select * from analysis_data limit 20;
+
+select * from parameter_groupings where param_grouping = "Embryonic Development";
+
+select doi.disease_onto_id, doi.disease_name, doi.omim_id, doi.gene_accession_id, gi.gene_id, gi.gene_symbol
+from disease_ontology_info doi
+left join gene_info gi
+on doi.gene_accession_id = gi.gene_accession_id where gene_id is not null;

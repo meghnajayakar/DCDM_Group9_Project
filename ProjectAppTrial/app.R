@@ -133,9 +133,9 @@ ui <- navbarPage(
     
     # page 1
     tabPanel(
-      "Knockout Gene - pvalue by Parameter Name",
+      "Knockout Gene - p-value by Parameter Name",
       
-      titlePanel("Knockout Gene - pvalue by Parameter Name"),
+      titlePanel("Knockout Gene - p-value by Parameter Name"),
       
       sidebarLayout(
         sidebarPanel(
@@ -154,9 +154,9 @@ ui <- navbarPage(
     
     # page 2
     tabPanel(
-      "Phenotype - pvalue by Gene",
+      "Phenotype - p-value by Gene",
       
-      titlePanel("Phenotype - pvalue by Gene"),
+      titlePanel("Phenotype - p-value by Gene"),
       
       sidebarLayout(
         sidebarPanel(
@@ -203,7 +203,7 @@ ui <- navbarPage(
     tabPanel(
       "More about the Genes of Interest",
       
-      titlePanel("P-values Parameters for Selected Genes"),
+      titlePanel("p-values for Parameters of Selected Genes"),
       
       fluidRow(
         column(

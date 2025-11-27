@@ -37,7 +37,7 @@ Run: SQL_DatabaseCode.qmd
 
 Database Dump: impc_grp9_sqldb_dumpfile.sql
 
-Sample Queries: /sql_queries/
+Sample Queries: sql_queries
 ________________________________________
 4. RShiny Visualization Dashboard
 

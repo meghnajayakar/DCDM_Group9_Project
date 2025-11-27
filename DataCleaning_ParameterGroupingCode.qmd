@@ -369,6 +369,14 @@ fwrite(df_param_grp, "./parametergroupings_working.csv")
 disease_onto <- read.csv("./Disease_information.txt", header = TRUE, sep = "\t")
 ```
 
+#### ensuring no leading/trailing white spaces exist 
+```{r}
+disease_onto$DO.Disease.ID <- trimws(disease_onto$DO.Disease.ID)
+disease_onto$DO.Disease.Name <- trimws(disease_onto$DO.Disease.Name)
+disease_onto$OMIM.IDs <- trimws(disease_onto$OMIM.IDs)
+disease_onto$Mouse.MGI.ID <- trimws(disease_onto$Mouse.MGI.ID)
+```
+
 #### making sure disease ontology has unique entries
 ```{r}
 dim(disease_onto) == dim(distinct(disease_onto))

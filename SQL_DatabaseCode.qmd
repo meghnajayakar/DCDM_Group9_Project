@@ -124,6 +124,18 @@ param_desc
 param_desc <- param_desc[, c("parameterId", "impcParameterOrigId", "name", "description")]
 ```
 
+#### converting and replacing the encoding error in name
+```{r}
+param_desc <- param_desc %>% mutate(description = recode(description, "NA" = ""))
+
+fix_encoding <- function(x) {
+  iconv(x, "UTF-8", "ASCII", sub = "")
+}
+
+param_desc$name <- fix_encoding(param_desc$name)
+param_desc$name <- gsub("\\bNave\\b", "Naive", param_desc$name)
+```
+
 #### ensuring no leading/trailing white spaces exist and that all observations are unique 
 ```{r}
 param_desc$parameterId <- trimws(param_desc$parameterId)
